@@ -1,0 +1,88 @@
+automation:
+  - type: custom
+    code: |
+      # 1. Initialisierung & Flag-Check
+      {% set args = &args& %}
+      {% set ignore = "-i" in args.lower() %}
+      {% set confirm = "-y" in args.lower() %}
+      {% set slots = character.spell_slots %}
+      
+      # 2. Slot-Suche
+      {% set has_lvl2 = slots.get_slots(2) > 0 %}
+      {% set next_available = 0 %}
+      {% for lvl in range(3, 10) %}
+        {% if slots.get_slots(lvl) > 0 and next_available == 0 %}
+          {% set next_available = lvl %}
+        {% endif %}
+      {% endfor %}
+
+      # 3. Validierung der Ressourcen
+      {% set target_level = 0 %}
+      {% if ignore %}
+        {% set target_level = 0 %}
+      {% elif has_lvl2 %}
+        {% set target_level = 2 %}
+      {% elif next_available > 0 %}
+        {% if confirm %}
+          {% set target_level = next_available %}
+        {% else %}
+          {{fail("Keine Level 2 Slots mehr frei! Willst du einen Slot der Stufe " ~ next_available ~ " nutzen? Dann caste erneut mit '-y' am Ende.")}}
+        {% endif %}
+      {% else %}
+        {{fail("Du hast keine Zauberplätze der Stufe 2 oder höher mehr frei!")}}
+      {% endif %}
+
+      # 4. Liste der verfügbaren Skills (nur die, die man NICHT hat)
+      {% set all_skills = ["acrobatics", "animal handling", "arcana", "athletics", "deception", "history", "insight", "intimidation", "investigation", "medicine", "nature", "perception", "performance", "persuasion", "religion", "sleight of hand", "stealth", "survival"] %}
+      {% set avail = [] %}
+      {% for s in all_skills %}
+        {% if not character.skills[s].proficient and not character.skills[s].expertise %}
+          {% do avail.append(s) %}
+        {% endif %}
+      {% endfor %}
+      
+      {% set ctx = {"available": avail, "ignore": ignore, "slot_to_use": target_level} %}
+      {{ctx}}
+
+  - type: choice
+    name: Skill
+    choices: "{{ctx.available}}"
+
+  - type: custom
+    code: |
+      {% set s = choice.Skill %}
+      {% set target_name = "Borrowed Knowledge: " ~ s %}
+      
+      # Check auf Dopplung
+      {% for item in character.inventory if target_name.lower() in item.name.lower() %}
+          {{fail("Borrowed Knowledge ist bereits für " ~ s ~ " aktiv!")}}
+      {% endfor %}
+
+      # Cleanup
+      {% set replaced = "" %}
+      {% for item in character.inventory if "Borrowed Knowledge:" in item.name %}
+          {% set replaced = item.name.split(': ')[1] %}
+          {{item.remove()}}
+      {% endfor %}
+      
+      {% set ctx = {"replaced": replaced, "ignore": ctx.ignore, "slot_to_use": ctx.slot_to_use} %}
+      {{ctx}}
+
+  # 5. Slot-Abzug (falls target_level > 0)
+  - type: spellslot
+    level: "{{ctx.slot_to_use}}"
+    condition: "{{ctx.slot_to_use > 0}}"
+
+  - type: text
+    content: |
+      ### ✨ Borrowed Knowledge wirkt!
+      {% if ctx.ignore %}
+      *(Kostenlos gewirkt via `-i`)*
+      {% else %}
+      *Ein Zauberplatz der Stufe **{{ctx.slot_to_use}}** wurde verbraucht.*
+      {% endif %}
+      
+      {% if ctx.replaced %}
+      *Die Proficiency in **{{ctx.replaced}}** verblasst...*
+      {% endif %}
+      **Neuer Fokus:** `{{choice.Skill | title}}`

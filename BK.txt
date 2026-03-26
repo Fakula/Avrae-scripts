@@ -1,0 +1,72 @@
+name: Borrowed Knowledge
+level: 2
+school: divination
+casting_time: Action
+components: V,S
+duration: 1 hour
+concentration: false
+description: >
+  You gain proficiency in one skill of your choice for 1 hour.
+
+automation:
+  - type: choice
+    name: Skill
+    choices:
+      - acrobatics
+      - animal handling
+      - arcana
+      - athletics
+      - deception
+      - history
+      - insight
+      - intimidation
+      - investigation
+      - medicine
+      - nature
+      - perception
+      - performance
+      - persuasion
+      - religion
+      - sleight of hand
+      - stealth
+      - survival
+
+  # 1. Prüfen: echte Proficiency oder Expertise
+  - type: custom
+    code: |
+      {% set s = choice.Skill %}
+      {% if character.skills[s].proficient or character.skills[s].expertise %}
+        {{fail("You are already proficient in " ~ s ~ "!")}}
+      {% endif %}
+
+  # 2. Prüfen: existiert bereits ein Borrowed-Knowledge-Item für diesen Skill?
+  - type: custom
+    code: |
+      {% set s = choice.Skill %}
+      {% for item in character.inventory %}
+        {% if "Borrowed Knowledge:" in item.name and s in item.name %}
+          {{fail("Borrowed Knowledge is already active for " ~ s ~ "!")}}
+        {% endif %}
+      {% endfor %}
+
+  # 3. Alle alten Borrowed-Knowledge-Items löschen
+  - type: custom
+    code: |
+      {% for item in character.inventory %}
+        {% if "Borrowed Knowledge:" in item.name %}
+          {{item.remove()}}
+        {% endif %}
+      {% endfor %}
+
+  # 4. Neues Item erzeugen
+  - type: itemcreate
+    name: "Borrowed Knowledge: {{choice.Skill}}"
+    item:
+      type: wondrous
+      rarity: common
+      description: "Grants proficiency in {{choice.Skill}} via Borrowed Knowledge."
+      effects:
+        - name: "Borrowed Knowledge ({{choice.Skill}})"
+          duration: 1h
+          skill: "{{choice.Skill}} +prof"
+          removeitem: true

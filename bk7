@@ -1,0 +1,46 @@
+_v: 2
+name: Borrowed Knowledge
+
+automation:
+
+# --- Skill Auswahl ---
+- type: variable
+  name: chosen_skill
+  value: choice
+  onError: ""
+
+# --- Prüfe Level 2 Slots ---
+- type: condition
+  condition: "{spellSlots.2} > 0"
+  onTrue:
+
+    # Slot verbrauchen
+    - type: counter
+      counter:
+        slot: 2
+      amount: "1"
+
+    # Output
+    - type: text
+      text: "{name} nutzt einen Zauberplatz der Stufe 2 und erhält Proficiency in {chosen_skill} für 1 Stunde."
+
+  onFalse:
+
+    # --- Prüfe Level 3 Slots ---
+    - type: condition
+      condition: "{spellSlots.3} > 0"
+      onTrue:
+
+        - type: counter
+          counter:
+            slot: 3
+          amount: "1"
+
+        - type: text
+          text: "{name} nutzt einen Zauberplatz der Stufe 3 und erhält Proficiency in {chosen_skill} für 1 Stunde."
+
+      onFalse:
+
+        # --- Kein Slot verfügbar ---
+        - type: text
+          text: "Du hast keine Zauberplätze der Stufe 2 oder höher mehr frei!"

@@ -1,0 +1,84 @@
+- type: custom
+  code: |
+    # 1. Initialisierung & Flag-Check
+    {% set args = &args& %}
+    {% set ignore = "-i" in args.lower() %}
+    {% set confirm = "-y" in args.lower() %}
+    {% set slots = character.spell_slots %}
+
+    # 2. Slot-Suche
+    {% set has_lvl2 = slots.get_slots(2) > 0 %}
+    {% set next_available = 0 %}
+    {% for lvl in range(3, 10) %}
+      {% if slots.get_slots(lvl) > 0 and next_available == 0 %}
+        {% set next_available = lvl %}
+      {% endif %}
+    {% endfor %}
+
+    # 3. Validierung der Ressourcen
+    {% set target_level = 0 %}
+    {% if ignore %}
+      {% set target_level = 0 %}
+    {% elif has_lvl2 %}
+      {% set target_level = 2 %}
+    {% elif next_available > 0 %}
+      {% if confirm %}
+        {% set target_level = next_available %}
+      {% else %}
+        {{fail("Keine Level 2 Slots mehr frei! Willst du einen Slot der Stufe " ~ next_available ~ " nutzen? Dann caste erneut mit '-y' am Ende.")}}
+      {% endif %}
+    {% else %}
+      {{fail("Du hast keine Zauberplätze der Stufe 2 oder höher mehr frei!")}}
+    {% endif %}
+
+    # 4. Aktive Borrowed-Knowledge-Skills sammeln
+    {% set bk_skills = [] %}
+    {% for item in character.inventory %}
+      {% if "Borrowed Knowledge:" in item.name %}
+        {% set skill = item.name.split(": ")[1].lower() %}
+        {% do bk_skills.append(skill) %}
+      {% endif %}
+    {% endfor %}
+
+    # 5. Liste der verfügbaren Skills
+    {% set all_skills = ["acrobatics", "animal handling", "arcana", "athletics", "deception", "history", "insight", "intimidation", "investigation", "medicine", "nature", "perception", "performance", "persuasion", "religion", "sleight of hand", "stealth", "survival"] %}
+    {% set avail = [] %}
+    {% for s in all_skills %}
+      {% if not character.skills[s].proficient 
+         and not character.skills[s].expertise
+         and s not in bk_skills %}
+        {% do avail.append(s) %}
+      {% endif %}
+    {% endfor %}
+
+    # 6. Gewählten Skill aus args extrahieren
+    {% set chosen = "" %}
+    {% for s in avail %}
+      {% if s in args.lower() %}
+        {% set chosen = s %}
+      {% endif %}
+    {% endfor %}
+
+    # 7. Ausgabe / Anwendung
+    {% if chosen != "" %}
+      {% if target_level > 0 %}
+        {{character.spell_slots.use_slot(target_level)}}
+      {% endif %}
+
+      {{embed(
+        title="Borrowed Knowledge",
+        desc=character.name ~ " nutzt einen Slot der Stufe " ~ target_level ~ " und erhält Wissen in **" ~ chosen ~ "**!",
+        color=0x7289da,
+        fields=[
+          ("Dauer", "1 Stunde"),
+          ("Hinweis", "Nutze `!check " ~ chosen ~ " +pb` für den Bonus.")
+        ]
+      )}}
+    {% else %}
+      {{embed(
+        title="Borrowed Knowledge - Verfügbare Skills",
+        desc="Wähle einen Skill aus der Liste:\n\n**" ~ avail|join(", ") ~ "**",
+        color=0x99aab5,
+        footer="Nutze !bk [Skill Name]"
+      )}}
+    {% endif %}

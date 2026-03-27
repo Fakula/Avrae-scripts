@@ -1,0 +1,44 @@
+!alias bk <drac2>
+ch = character()
+sb = ch.spellbook
+args = "&ARGS&".lower()
+ignore = "-i" in args
+confirm = "-y" in args
+
+# 1. Slot-Suche & Validierung
+has_lvl2 = sb.get_slots(2) > 0
+next_available = 0
+for lvl in range(3, 10):
+    if sb.get_slots(lvl) > 0 and next_available == 0:
+        next_available = lvl
+
+target_level = 0
+if ignore:
+    target_level = 0
+elif has_lvl2:
+    target_level = 2
+elif next_available > 0:
+    if not confirm:
+        return f'echo Keine Level 2 Slots mehr frei! Nutze "-y" für Level {next_available}.'
+    target_level = next_available
+else:
+    return 'echo Du hast keine passenden Zauberplätze (Level 2+) mehr frei!'
+
+# 2. Skill-Abgleich (Manuelle Suche statt next())
+all_skills = ["acrobatics", "animalHandling", "arcana", "athletics", "deception", "history", "insight", "intimidation", "investigation", "medicine", "nature", "perception", "performance", "persuasion", "religion", "sleightOfHand", "stealth", "survival"]
+avail = [s for s in all_skills if ch.skills[s].prof == 0]
+
+chosen_skill = None
+for s in avail:
+    if s.lower() in args:
+        chosen_skill = s
+        break
+
+# 3. Aktion ausführen
+if chosen_skill:
+    if target_level > 0:
+        sb.use_slot(target_level)
+    return f'embed -title "Borrowed Knowledge" -desc "{ch.name} nutzt einen Slot der Stufe {target_level} und erhält Wissen in **{chosen_skill}**!" -color #7289da -f "Dauer|1 Stunde" -f "Hinweis|Nutze `!check {chosen_skill} +pb` für den Bonus."'
+else:
+    return f'embed -title "Borrowed Knowledge - Verfügbare Skills" -desc "Wähle einen Skill aus der Liste aus:\\n\\n**{", ".join(avail)}**" -footer "Nutze !bk [Skill Name]" -color #99aab5'
+</drac2>
